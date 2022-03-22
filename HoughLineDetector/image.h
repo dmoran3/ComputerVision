@@ -104,9 +104,12 @@ void GenerateLines(int hough_array[][180], int max_rho, int max_val,Image *an_im
 
 void DrawHoughLines(Image *an_image, std::string text_file, int threshold);
 
-void TruncateLines(Image *an_image, std::string text_file, int threshold);
+void DrawHoughLinesWithEndpoints(Image *an_image, std::string text_file, int threshold);
 
-void LabelBinaryImage(int hough_array[][180], int max_rho);
+void GenerateCutoffLines(int hough_array[][180], int max_rho, int max_val,Image *an_image, int threshold);
+
+void DrawLineWithEndpoints(int x0, int y0, int x1, int y1, int color, Image *an_image);
+
 
 }  // namespace ComputerVisionProjects
 

@@ -293,7 +293,6 @@ void DrawLine(int x0, int y0, int x1, int y1, int color,
 // p4 p5 p6  centered around p5
 // p7 p8 p9
 
-
 void GenerateEdgeImage(Image *an_image){
 	//i is rows, j is cols
 	
@@ -305,6 +304,7 @@ void GenerateEdgeImage(Image *an_image){
 	
 	for(int j = 1; j < j_max-1; j+=2){
 		for(int i = 1; i < i_max-1; i+=2){
+			//top row
 			int p1 = an_image->GetPixel(i-1,j-1) * -1;
 			int p2 = an_image->GetPixel(i-1,j) * 0;
 			int p3 = an_image->GetPixel(i-1,j+1) * 1;
@@ -317,8 +317,10 @@ void GenerateEdgeImage(Image *an_image){
 			int p8 = an_image->GetPixel(i+1,j) * 0;
 			int p9 = an_image->GetPixel(i+1,j+1) * 1;
 			
+			//calculate dx from horizontal sobel mask
 			int dx = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
 			
+			//top row
 			p1 = an_image->GetPixel(i-1,j-1) * 1;
 			p2 = an_image->GetPixel(i-1,j) * 2;
 			p3 = an_image->GetPixel(i-1,j+1) * 1;
@@ -331,23 +333,26 @@ void GenerateEdgeImage(Image *an_image){
 			p8 = an_image->GetPixel(i+1,j) * -2;
 			p9 = an_image->GetPixel(i+1,j+1) * -1;
 			
+			//calculate dy from vertical sobel mask
 			int dy = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
 			
-			//cout << i << " " << j << " " << dx << " " << dy << endl;
-			
+			//get the magnitude at each pixel			
 			int magnitude = sqrt((dx * dx) + (dy * dy));
 			if(magnitude > max) max = magnitude;
-			if(magnitude < min) min = magnitude;
+			if(magnitude < min) min = magnitude;			
 			
-			//cout << i << " " << j << " " << magnitude << endl;
-			
-			
+			//place values into an edge map array
 			edge_map[i][j] = magnitude;
 		}
 	}	
+
+	//
+	// CAN WE REMOVE THIS DIFF AND MAX?
+	//
 	int diff = max;
 	for(int j = 1; j < j_max-1; j++){
 		for(int i = 1; i < i_max-1; i++){
+			//set color of pixel to magnitude
 			int color = (edge_map[i][j]);
 			an_image->SetPixel(i,j,color);
 		}
@@ -358,18 +363,23 @@ void GenerateEdgeImage(Image *an_image){
 
 void MakeBinary(int threshold, Image *an_image){
 	if (an_image == nullptr) abort();
-	// Start the scan.
+	
 	int x = 0;
 	int y = 0;
 	int x_max = an_image->num_rows();
 	int y_max = an_image->num_columns();
 	int done = 0;
 	int color;
+
+	// Start the scan.
 	while (!done) {
 		if(an_image->GetPixel(x,y) < threshold)
 		{
+			//if pixel is below threshold, set it to 0
 			color = 0;
 		} else {
+
+			//if above, set to 255
 			color = 255;
 		}
 		
@@ -398,11 +408,15 @@ void GenerateHoughArray(Image *an_image, int threshold, string text_file){
 	// 0 <= theta < pi and using ints to represent it, use degrees
 	// to 0 <= theta < 180
 	
+	//created array with length max_rho*2 so it can 
+	//account for negative rho values
 	int accumulator[max_rho*2][180] = {{0}};
 	for(int rho = 0;  rho < max_rho; rho++){
 		for(int theta = 0; theta < 180; theta++){
 			if(accumulator[rho][theta] != 0){
-				//~ cout << rho << " " << theta << endl;
+				//double checking that all values 
+				//initialized to 0 because I ran into
+				//issues with it earlier
 				accumulator[rho][theta] = 0;
 			}
 		}
@@ -446,6 +460,7 @@ void GenerateHoughImage(int hough_array[][180], int max_rho, int max_val, Image 
 		}
 	}
 	
+	//write the file into the given text file
 	ofstream file(text_file);
 	for(int rho = 0;  rho < max_rho*2; rho++){
 		for(int theta = 0; theta < 180; theta++){
@@ -544,169 +559,277 @@ void GenerateLines(int hough_array[][180], int max_rho, int max_val, Image *an_i
 	}
 }
 
-void TruncateLines(Image *an_image, std::string text_file, int threshold){
-	//Plan is to make a Binary Image of the given image, then draw the 
-	//lines only on points that also have edges in the Binary image
+void DrawHoughLinesWithEndpoints(Image *an_image, string text_file, int threshold){
 	
-	//Make Binary Image
-	Image bin_img;
-	MakeBinary(25, &bin_img);
+	int i_max = an_image->num_rows();
+	int j_max = an_image->num_columns();
+	int max_val = 0;
+	// max_rho = max diagonal line in the images provided
+	int max_rho = (int)(sqrt((i_max * i_max) + (j_max * j_max)));
+	// 0 <= theta < pi and using ints to represent it, use degrees
+	// to 0 <= theta < 180
+	int accumulator[max_rho*2][180] = {{0}};
+	ifstream file(text_file);
+	for(int rho = 0;  rho < max_rho*2; rho++){
+		for(int theta = 0; theta < 180; theta++){
+            file >> accumulator[rho][theta];
+            if(accumulator[rho][theta] > max_val){
+				max_val = accumulator[rho][theta];
+			}
+        }
+    }
+    file.close();
+    
+	
+	GenerateCutoffLines(accumulator, max_rho, max_val, an_image, threshold);
+}
+
+void GenerateCutoffLines(int hough_array[][180], int max_rho, int max_val,Image *an_image, int threshold){
+	
+	int img_w = an_image->num_columns();
+	int img_h = an_image->num_rows();
+	int counter = 0;
+
+	
+	
+	for(int rho = 0;  rho < max_rho*2; rho++){
+		//~ cout<<rho<<"/"<<max_rho<<endl;
+		for(int theta = 0; theta < 179; theta++){
+			//~ cout<<theta<<endl;
+			if(hough_array[rho][theta] >= threshold){
+				//local maxima
+				int max = hough_array[rho][theta];
+				
+
+				int x1, y1, x2, y2;  
+				x1 = y1 = x2 = y2 = 0; 
+				
+				//to account for negative rho values 
+				int rho_offset = rho - ( max_rho / 2);
+				
+				if(theta >= 45 && theta <= 135)  
+				{  
+					//y = (r - x cos(theta)) / sin(theta) 
+					//~ cout << rho << endl;
+					x1 = 0;  
+					y1 = (rho_offset- (x1 * cos(theta* (M_PI / 180)))) / sin(theta* (M_PI / 180));  
+					x2 = img_w-1;  
+					y2 = (rho_offset - (x2 * cos(theta* (M_PI / 180)))) / sin(theta* (M_PI / 180));
+					//~ cout << rho << "  " << y2 << "  " << x2 << "  " << theta << "  " << sin(theta* (M_PI / 180)) << " " << cos(theta * (M_PI / 180)) << endl;
+				}
+				else  
+				{  
+					//x = (r - y sin(theta)) / cos(theta);
+					y1 = 0;  
+					x1 = (rho_offset - (y1 * sin(theta* (M_PI / 180)))) / cos(theta * (M_PI / 180));  
+					y2 = img_h-1;  
+					x2 = (rho_offset - (y2 * sin(theta* (M_PI / 180)))) / cos(theta* (M_PI / 180)); 
+					//~ cout << rho << "  " << y2 << "  " << sin(theta* (M_PI / 180)) << " " << cos(theta* (M_PI / 180)) << endl;
+					
+				}
+				//check if any lines are too long and cut them off
+				if(x1 < 0){ x1 = 0;}
+				if(y1 < 0){ y1 = 0;}
+				if(x2 < 0){ x2 = 0;}
+				if(y2 < 0){ y2 = 0;}
+				if(x1 >= img_w){ x1 = img_w-1;}
+				if(y1 >= img_h){ y1 = img_h-1;}
+				if(x2 >= img_w){ x2 = img_w-1;}
+				if(y2 >= img_h){ y2 = img_h-1;}
+				//~ cout << theta << " " << rho  << " " << x1 << " " << y1 << " " << x2 << " " << y2 << endl;
+				//Draw the line from x1,y1 to x2,y2
+				DrawLineWithEndpoints(y1, x1, y2, x2, 255, an_image);
+			}
+		}
+	}
+}
+	
+
 	
 	
 	
 }
 
-//~ // Implements the Bresenham's incremental midpoint algorithm;
-//~ // (adapted from J.D.Foley, A. van Dam, S.K.Feiner, J.F.Hughes
-//~ // "Computer Graphics. Principles and practice", 
-//~ // 2nd ed., 1990, section 3.2.2);  
-//~ void DrawLineWithEndpoints(int x0, int y0, int x1, int y1, int color,
-	      //~ Image *an_image) {  
-  //~ if (an_image == nullptr) abort();
+// ~ // Implements the Bresenham's incremental midpoint algorithm;
+// ~ // (adapted from J.D.Foley, A. van Dam, S.K.Feiner, J.F.Hughes
+// ~ // "Computer Graphics. Principles and practice", 
+// ~ // 2nd ed., 1990, section 3.2.2);  
+// ~ void DrawLineWithEndpoints(int x0, int y0, int x1, int y1, int color,
+// 	      ~ Image *an_image) {  
+//   ~ if (an_image == nullptr) abort();
 
-//~ #ifdef SWAP
-//~ #undef SWAP
-//~ #endif
-//~ #define SWAP(a,b) {a^=b; b^=a; a^=b;}
+// ~ #ifdef SWAP
+// ~ #undef SWAP
+// ~ #endif
+// ~ #define SWAP(a,b) {a^=b; b^=a; a^=b;}
 
-  //~ const int DIR_X = 0;
-  //~ const int DIR_Y = 1;
+
+
+// ~	//Plan is to make a Binary Image of the given image, then draw the 
+// ~	//lines only on points that also have edges in the Binary image
+	
+// ~	//Make Binary Image with low threshold to find all edges
+// ~    Image bin_img;
+	// int i_max = an_image->num_rows();
+	// int j_max = an_image->num_columns();
+	// an_image->AllocateSpaceAndSetSize(i_max, j_max);
+	// an_image->SetNumberGrayLevels(255);
+// //Copy the input image into a copy called bin_img
+// //that we will use to create a binary edge image
+//	for (int i = 0; i < i_max; ++i)
+//     for (int j = 0; j < j_max; ++j)
+//       bin_img.SetPixel(i, j, an_image->GetPixel(i, j));
+	// GenerateEdgeImage(bin_img);
+	// MakeBinary(20, bin_img);
+
+
+// ~	
+//   ~ const int DIR_X = 0;
+//   ~ const int DIR_Y = 1;
   
-  //~ // Increments: East, North-East, South, South-East, North.
-  //~ int incrE,
-    //~ incrNE,
-    //~ incrS,
-    //~ incrSE,
-    //~ incrN;     
-  //~ int d;         /* the D */
-  //~ int x,y;       /* running coordinates */
-  //~ int mpCase;    /* midpoint algorithm's case */
-  //~ int done;      /* set to 1 when done */
+//   ~ // Increments: East, North-East, South, South-East, North.
+//   ~ int incrE,
+//     ~ incrNE,
+//     ~ incrS,
+//     ~ incrSE,
+//     ~ incrN;     
+//   ~ int d;         /* the D */
+//   ~ int x,y;       /* running coordinates */
+//   ~ int mpCase;    /* midpoint algorithm's case */
+//   ~ int done;      /* set to 1 when done */
   
-  //~ int xmin = x0;
-  //~ int xmax = x1;
-  //~ int ymin = y0;
-  //~ int ymax = y1;
+//   ~ int xmin = x0;
+//   ~ int xmax = x1;
+//   ~ int ymin = y0;
+//   ~ int ymax = y1;
   
-  //~ int dx = xmax - xmin;
-  //~ int dy = ymax - ymin;
-  //~ int dir;
+//   ~ int dx = xmax - xmin;
+//   ~ int dy = ymax - ymin;
+//   ~ int dir;
 
-  //~ if (dx * dx > dy * dy) {  // Horizontal scan.
-    //~ dir=DIR_X;
-    //~ if (xmax < xmin) {
-      //~ SWAP(xmin, xmax);
-      //~ SWAP(ymin , ymax);
-    //~ } 
-    //~ dx = xmax - xmin;
-    //~ dy = ymax - ymin;
+//   ~ if (dx * dx > dy * dy) {  // Horizontal scan.
+//     ~ dir=DIR_X;
+//     ~ if (xmax < xmin) {
+//       ~ SWAP(xmin, xmax);
+//       ~ SWAP(ymin , ymax);
+//     ~ } 
+//     ~ dx = xmax - xmin;
+//     ~ dy = ymax - ymin;
 
-    //~ if (dy >= 0) {
-      //~ mpCase = 1;
-      //~ d = 2 * dy - dx;      
-    //~ } else {
-      //~ mpCase = 2;
-      //~ d = 2 * dy + dx;      
-    //~ }
+//     ~ if (dy >= 0) {
+//       ~ mpCase = 1;
+//       ~ d = 2 * dy - dx;      
+//     ~ } else {
+//       ~ mpCase = 2;
+//       ~ d = 2 * dy + dx;      
+//     ~ }
 
-    //~ incrNE = 2 * (dy - dx);
-    //~ incrE = 2 * dy;
-    //~ incrSE = 2 * (dy + dx);
-  //~ } else {// vertical scan.
-    //~ dir = DIR_Y;
-    //~ if (ymax < ymin) {
-      //~ SWAP(xmin, xmax);
-      //~ SWAP(ymin, ymax);
-    //~ }
-    //~ dx = xmax - xmin;
-    //~ dy = ymax-ymin;    
+//     ~ incrNE = 2 * (dy - dx);
+//     ~ incrE = 2 * dy;
+//     ~ incrSE = 2 * (dy + dx);
+//   ~ } else {// vertical scan.
+//     ~ dir = DIR_Y;
+//     ~ if (ymax < ymin) {
+//       ~ SWAP(xmin, xmax);
+//       ~ SWAP(ymin, ymax);
+//     ~ }
+//     ~ dx = xmax - xmin;
+//     ~ dy = ymax-ymin;    
 
-    //~ if (dx >=0 ) {
-      //~ mpCase = 1;
-      //~ d = 2 * dx - dy;      
-    //~ } else {
-      //~ mpCase = 2;
-      //~ d = 2 * dx + dy;      
-    //~ }
+//     ~ if (dx >=0 ) {
+//       ~ mpCase = 1;
+//       ~ d = 2 * dx - dy;      
+//     ~ } else {
+//       ~ mpCase = 2;
+//       ~ d = 2 * dx + dy;      
+//     ~ }
 
-    //~ incrNE = 2 * (dx - dy);
-    //~ incrE = 2 * dx;
-    //~ incrSE = 2 * (dx + dy);
-  //~ }
+//     ~ incrNE = 2 * (dx - dy);
+//     ~ incrE = 2 * dx;
+//     ~ incrSE = 2 * (dx + dy);
+//   ~ }
   
-  //~ /// Start the scan.
-  //~ x = xmin;
-  //~ y = ymin;
-  //~ done = 0;
+//   ~ /// Start the scan.
+//   ~ x = xmin;
+//   ~ y = ymin;
+//   ~ done = 0;
 
-  //~ while (!done) {
-    //~ an_image->SetPixel(x,y,color);
-  
-    //~ // Move to the next point.
-    //~ switch(dir) {
-    //~ case DIR_X: 
-      //~ if (x < xmax) {
-	      //~ switch(mpCase) {
-	      //~ case 1:
-		//~ if (d <= 0) {
-		  //~ d += incrE;  
-		  //~ x++;
-		//~ } else {
-		  //~ d += incrNE; 
-		  //~ x++; 
-		  //~ y++;
-		//~ }
-		//~ break;
-  
-            //~ case 2:
-              //~ if (d <= 0) {
-                //~ d += incrSE; 
-		//~ x++; 
-		//~ y--;
-              //~ } else {
-                //~ d += incrE;  
-		//~ x++;
-              //~ }
-	      //~ break;
-	      //~ } 
-      //~ } else {
-	//~ done=1;
-      //~ }     
-      //~ break;
+//   ~ while (!done) {
 
-    //~ case DIR_Y: 
-        //~ if (y < ymax) {
-          //~ switch(mpCase) {
-	  //~ case 1:
-	    //~ if (d <= 0) {
-	      //~ d += incrE;  
-	      //~ y++;
-	    //~ } else {
-	      //~ d += incrNE; 
-	      //~ y++; 
-	      //~ x++;
-	    //~ }
-            //~ break;
+// //If pixel has value 255 in the binary edge image,
+// //we can set it to 255 on the line else, we skip it
+// //and keep drawing the line
+// if(bin_img.GetPixel(x,y) == 255){
+	//     ~ an_image->SetPixel(x,y,color);
+//}
+
+
   
-	  //~ case 2:
-	    //~ if (d <= 0) {
-                //~ d += incrSE; 
-		//~ y++; 
-		//~ x--;
-              //~ } else {
-                //~ d += incrE;  
-		//~ y++;
-	    //~ }
-            //~ break;
-	  //~ } // mpCase
-        //~ } // y < ymin 
-        //~ else {
-	  //~ done=1;
-	//~ }
-	//~ break;    
-    //~ }
-  //~ }
-//~ }
+//     ~ // Move to the next point.
+//     ~ switch(dir) {
+//     ~ case DIR_X: 
+//       ~ if (x < xmax) {
+// 	      ~ switch(mpCase) {
+// 	      ~ case 1:
+// 		~ if (d <= 0) {
+// 		  ~ d += incrE;  
+// 		  ~ x++;
+// 		~ } else {
+// 		  ~ d += incrNE; 
+// 		  ~ x++; 
+// 		  ~ y++;
+// 		~ }
+// 		~ break;
+  
+//             ~ case 2:
+//               ~ if (d <= 0) {
+//                 ~ d += incrSE; 
+// 		~ x++; 
+// 		~ y--;
+//               ~ } else {
+//                 ~ d += incrE;  
+// 		~ x++;
+//               ~ }
+// 	      ~ break;
+// 	      ~ } 
+//       ~ } else {
+// 	~ done=1;
+//       ~ }     
+//       ~ break;
+
+//     ~ case DIR_Y: 
+//         ~ if (y < ymax) {
+//           ~ switch(mpCase) {
+// 	  ~ case 1:
+// 	    ~ if (d <= 0) {
+// 	      ~ d += incrE;  
+// 	      ~ y++;
+// 	    ~ } else {
+// 	      ~ d += incrNE; 
+// 	      ~ y++; 
+// 	      ~ x++;
+// 	    ~ }
+//             ~ break;
+  
+// 	  ~ case 2:
+// 	    ~ if (d <= 0) {
+//                 ~ d += incrSE; 
+// 		~ y++; 
+// 		~ x--;
+//               ~ } else {
+//                 ~ d += incrE;  
+// 		~ y++;
+// 	    ~ }
+//             ~ break;
+// 	  ~ } // mpCase
+//         ~ } // y < ymin 
+//         ~ else {
+// 	  ~ done=1;
+// 	~ }
+// 	~ break;    
+//     ~ }
+//   ~ }
+// ~ }
 
 
 }  // namespace ComputerVisionProjects
