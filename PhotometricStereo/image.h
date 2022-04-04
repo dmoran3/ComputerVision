@@ -82,7 +82,7 @@ void DrawLine(int x0, int y0, int x1, int y1, int color,
 //----------------------------------------------------------------------
 void ExportObjectData(int threshold, std::string text_file, Image *an_image);
 
-
+void FindLightSource(std::string in_file, std::string out_file, Image *an_image);
 //----------------------------------------------------------------------
 }  // namespace ComputerVisionProjects
 

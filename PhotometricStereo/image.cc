@@ -3,6 +3,7 @@
 // To be used in Computer Vision class.
 
 #include "image.h"
+#include <math.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -385,14 +386,87 @@ void ExportObjectData(int threshold, string text_file, Image *an_image){
 	int radius = ((right_val - left_val) + (bottom_val - top_val)) / 4;
 	
 	ofstream file(text_file);
-    file << x_center << " " << y_center << " " << radius;
+    file << x_center  << " " << y_center << " " << radius;
     file.close();
 }
 
 /*
  * s2: Compute the directions and intensities of light sources affecting 
  * and object.
- * /*
+ * Compute Normal Vector to surface at a given point.
+ * This formula should give you the resulting normal vector in a 3-D
+ * coordinate system, originating at the object’s center.
+*/
+void FindLightSource(string in_file, string out_file, Image *an_image){
+	if (an_image == nullptr) abort();
+
+	//Initialize x and y iterators, x and y center values, x, y, and z
+	//point values, and the radius
+	int x = 0;
+	int y = 0;
+	int x_c = 0;
+	int y_c = 0;
+	int x_p = 0;
+	int y_p = 0;
+	int z_p = 0;
+	int radius = 0;
+	
+	//Read in values from params file
+	ifstream file(in_file);
+    file >> x_c >> y_c >> radius;
+    file.close();
+    
+	// Find brightest pixel in image
+	int x_max = an_image->num_rows();
+	int y_max = an_image->num_columns();
+	int done = 0;
+	// Start the scan.
+	int max_brightness = 0;
+	while (!done) {
+		if(an_image->GetPixel(x,y) > max_brightness){
+			//new max
+			x_p = x;
+			y_p = y;
+			max_brightness = an_image->GetPixel(x,y);			
+		}
+
+		if (x < x_max-1) {
+			x++;
+		}
+		else{ //at end of line
+			if(y == y_max-1){ //at end of image
+				done = 1;
+			}
+			x = 0;
+			y++;
+		}
+	}//Scan ended
+		
+	
+	//FORMULA
+	//R^2 - (x_p - x_c)^2 - (y_p - y_c)^2 = z_p^2
+	//z_p = sqrt(R^2 - (x_p - x_c)^2 - (y_p - y_c)^2)
+	double_t term1 = pow(radius,2);
+	double_t term2 = pow((x_p - x_c),2);
+	double_t term3 =pow((y_p - y_c),2);
+	z_p = sqrt((term1 - term2 - term3));
+
+	//Initialize vector values
+	int x_v = 0;
+	int y_v = 0;
+	int z_v = 0;
+	double scale_val = max_brightness / 255.0;
+	cout << max_brightness << "  " << scale_val << endl;
+	x_v = (x_p-x_c);// * scale_val;
+	y_v = (y_p-y_c);// * scale_val;
+	z_v = z_p;// * scale_val;
+
+	ofstream ofile(out_file);
+	file.open()
+    ofile << x_v << " " << y_v << " "  << z_v << endl;;
+    ofile.close();
+	
+}
 
 
 //----------------------------------------------------------------------
