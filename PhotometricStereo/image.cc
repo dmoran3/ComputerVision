@@ -11,6 +11,7 @@
 #include <fstream>
 #include <string>
 
+
 using namespace std;
 
 namespace ComputerVisionProjects {
@@ -456,18 +457,246 @@ void FindLightSource(string in_file, string out_file, Image *an_image){
 	int y_v = 0;
 	int z_v = 0;
 	double scale_val = max_brightness / 255.0;
-	cout << max_brightness << "  " << scale_val << endl;
 	x_v = (x_p-x_c);// * scale_val;
 	y_v = (y_p-y_c);// * scale_val;
 	z_v = z_p;// * scale_val;
 
-	ofstream ofile(out_file);
-	file.open()
+	ofstream ofile(out_file, ios_base::app);
     ofile << x_v << " " << y_v << " "  << z_v << endl;;
     ofile.close();
 	
 }
 
+/*
+ * s3: Compute surface normals of the object
+ * Given 3 images of an object and the direction of the light source
+ * Compute normals at pixels that are visible in all three images
+ * Compute normals at pixels every N steps apart(step is an argument)
+ * From each pixel, draw a line that is the projection of the normal
+ * onto an image plane
+ * 
+ * S = [s1, s2, s3]
+ * N = S^-1[I1 I2 I3]
+ * 
+*/
+void ComputeSurfaceNormals(string in_file,Image* image_1,Image* image_2,
+		Image* image_3, int threshold, int step){
+	if (image_1 == nullptr) abort();
+	if (image_2 == nullptr) abort();
+	if (image_3 == nullptr) abort();
+	
+	//Initialize light source direction vector
+	int s_x = 0;
+	int s_y = 0;
+	int s_z = 0;
+	float_t S[3][3];
+	float_t S_inv[3][3];
+	
+	int x = 0;
+	int y = 0;
+	int x_max = image_1->num_rows();
+	int y_max = image_1->num_columns();
+	int done = 0;
+	
+	ifstream infile(in_file);
+	for(int i = 0; i < 3; i++){
+		for(int j = 0; j < 3; j++){
+			infile >> S[i][j];
+		}
+	}
+	
+	float_t det = 0.0;
+	//determinant of S
+	for(int i = 0; i < 3; i++)
+		det = det + (S[0][i] * (S[1][(i+1)%3] * S[2][(i+2)%3] - 
+		S[1][(i+2)%3] * S[2][(i+1)%3]));
+
+	//reverse the matrix
+	for(int i = 0; i < 3; i++){
+		for(int j = 0; j < 3; j++)
+			S_inv[i][j] = ((S[(j+1)%3][(i+1)%3] * S[(j+2)%3][(i+2)%3]) -
+			 (S[(j+1)%3][(i+2)%3] * S[(j+2)%3][(i+1)%3])) / det;
+	}
+	
+
+	
+	// N = S_inv * [I1, I2, I3] at each point x,y
+	// N will be represented by N_x, N_y, and N_z
+	float_t N_x = 0.0;
+	float_t N_y = 0.0;
+	float_t N_z = 0.0;
+	int I1 = 0;
+	int I2 = 0;
+	int I3 = 0;
+	
+	// Start the scan.
+	while (!done) {
+		I1 = image_1->GetPixel(x,y);
+		I2 = image_2->GetPixel(x,y);
+		I3 = image_3->GetPixel(x,y);
+		if( I1 > threshold && I2 > threshold && I3 > threshold){
+			//If x,y is above the threshold for all images, compute N
+			N_x = (I1*S_inv[0][0])+(I2*S_inv[0][1])+(I3*S_inv[0][2]);
+			N_y = (I1*S_inv[1][0])+(I2*S_inv[1][1])+(I3*S_inv[1][2]);
+			N_z = (I1*S_inv[2][0])+(I2*S_inv[2][1])+(I3*S_inv[2][2]);
+			
+			N_x = N_x/N_z;
+			N_y = N_y/N_z;
+			N_z = N_z/N_z;
+			
+			float_t N_mag = sqrt((N_x * N_x) + (N_y * N_y) +1);
+			
+			//orientation of surface normal is now [n_x/N_mag, N_y/N_mag,
+			//1/N_mag]
+			if(x > 2 && x < x_max - 2 && y > 2 && y < y_max - 2){
+				for(int i = -1; i <= 1; i++){
+					for(int j = -1; j <= 1; j++){
+						image_1->SetPixel(x+i,y+j,255);
+					}
+				}
+				image_1->SetPixel(x,y,0);
+			}
+			DrawLine(x, y, (N_x * 10)+x, (N_y * 10)+y, 255, image_1);
+			
+			
+			
+		}
+
+		if (x < x_max-step-1) {
+			x+=step;
+		}
+		else{ //at end of line
+			if(y > y_max-step-1){ //at end of image
+				done = 1;
+			}
+			x = 0;
+			y+=step;
+		}
+	}//Scan ended
+	
+}
+
+/*
+ * s4: Compute surface albedo
+ * compute albedo for all pixels above threshold in all images
+ * scale them up or down to fit range 0 to 255
+*/
+void ComputeAlbedoMap(string in_file,Image* image_1,Image* image_2,
+		Image* image_3, int threshold){
+	if (image_1 == nullptr) abort();
+	if (image_2 == nullptr) abort();
+	if (image_3 == nullptr) abort();
+	
+	//Initialize light source direction vector
+	int s_x = 0;
+	int s_y = 0;
+	int s_z = 0;
+	float_t S[3][3];
+	float_t S_inv[3][3];
+
+	
+	int x = 0;
+	int y = 0;
+	int x_max = image_1->num_rows();
+	int y_max = image_1->num_columns();
+	float_t raw_albedos[x_max][y_max];
+	int done = 0;
+	
+	ifstream infile(in_file);
+	for(int i = 0; i < 3; i++){
+		for(int j = 0; j < 3; j++){
+			infile >> S[i][j];
+		}
+	}
+	
+	float_t det = 0.0;
+	//determinant of S
+	for(int i = 0; i < 3; i++)
+		det = det + (S[0][i] * (S[1][(i+1)%3] * S[2][(i+2)%3] - 
+		S[1][(i+2)%3] * S[2][(i+1)%3]));
+	//reverse the matrix
+	for(int i = 0; i < 3; i++){
+		for(int j = 0; j < 3; j++)
+			S_inv[i][j] = ((S[(j+1)%3][(i+1)%3] * S[(j+2)%3][(i+2)%3]) -
+			 (S[(j+1)%3][(i+2)%3] * S[(j+2)%3][(i+1)%3])) / det;
+	}
+	
+	
+	
+	// N = S_inv * [I1, I2, I3] at each point x,y
+	// N will be represented by N_x, N_y, and N_z
+	float_t N_x = 0.0;
+	float_t N_y = 0.0;
+	float_t N_z = 0.0;
+	int I1 = 0;
+	int I2 = 0;
+	int I3 = 0;
+	
+	float_t max_albedo = 0;
+	// Start the scan.
+	while (!done) {
+		I1 = image_1->GetPixel(x,y);
+		I2 = image_2->GetPixel(x,y);
+		I3 = image_3->GetPixel(x,y);
+		if( I1 > threshold && I2 > threshold && I3 > threshold){
+			//If x,y is above the threshold for all images, compute N
+			N_x = (I1*S_inv[0][0])+(I2*S_inv[0][1])+(I3*S_inv[0][2]);
+			N_y = (I1*S_inv[1][0])+(I2*S_inv[1][1])+(I3*S_inv[1][2]);
+			N_z = (I1*S_inv[2][0])+(I2*S_inv[2][1])+(I3*S_inv[2][2]);
+
+			N_x = N_x/N_z;
+			N_y = N_y/N_z;
+			N_z = N_z/N_z;
+
+			float_t N_mag = sqrt((N_x * N_x) + (N_y * N_y) +1);
+			raw_albedos[x][y] = N_mag;
+			
+			max_albedo = max(N_mag, max_albedo);
+			
+		}
+
+
+		if (x < x_max-1) {
+			x++;
+		}
+		else{ //at end of line
+			if(y > y_max-2){ //at end of image
+				done = 1;
+			}
+			x = 0;
+			y++;
+		}
+	}//Scan ended
+
+	float_t scale_val = 255/max_albedo;
+	done = 0;
+	x = 0;
+	y= 0;
+	// Start the coloring.
+	while (!done) {
+		I1 = image_1->GetPixel(x,y);
+		I2 = image_2->GetPixel(x,y);
+		I3 = image_3->GetPixel(x,y);
+		if( I1 > threshold && I2 > threshold && I3 > threshold){
+			//If x,y is above the threshold for all images, compute N
+			image_1->SetPixel(x,y,(int)(raw_albedos[x][y] * scale_val));			
+		}
+		else{
+			image_1->SetPixel(x,y,0);
+		}
+		if (x < x_max-1) {
+			x+=1;
+		}
+		else{ //at end of line
+			if(y > y_max-2){ //at end of image
+				done = 1;
+			}
+			x = 0;
+			y+=1;
+		}
+	}//Coloring ended 
+	
+}
 
 //----------------------------------------------------------------------
 

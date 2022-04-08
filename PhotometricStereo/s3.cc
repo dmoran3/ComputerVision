@@ -12,38 +12,40 @@ using namespace ComputerVisionProjects;
 
 int main(int argc, char **argv){
   
-	if (argc!=6) {
-		printf("Usage: %s param_infile img1 img2 img3 param_outfile\n", argv[0]);
+	if (argc!=8) {
+		printf("Usage: %s param_infile img1 img2 img3 step threshold param_outfile\n", argv[0]);
 		return 0;
 	}
 	const string input_file(argv[1]);
 	const string image_file_1(argv[2]);
 	const string image_file_2(argv[3]);
 	const string image_file_3(argv[4]);
-	const string output_file(argv[5]);
-	std::ofstream file;
-	file.open(output_file, std::ofstream::out | std::ofstream::trunc);
-	file.close();
+	int step = atoi((argv[5]));
+	int threshold = atoi((argv[6]));
+	const string output_file(argv[7]);
 
-	Image an_image;
-	if (!ReadImage(image_file_1, &an_image)) {
+	Image image_1;
+	if (!ReadImage(image_file_1, &image_1)) {
 		cout <<"Can't open file " << image_file_1 << endl;
 		return 0;
 	}
-	
-	FindLightSource(input_file, output_file, &an_image);
-
-	if (!ReadImage(image_file_2, &an_image)) {
+	Image image_2;
+	if (!ReadImage(image_file_2, &image_2)) {
 		cout <<"Can't open file " << image_file_2 << endl;
 		return 0;
 	}
-	FindLightSource(input_file, output_file, &an_image);
-
-	if (!ReadImage(image_file_3, &an_image)) {
+	Image image_3;
+	if (!ReadImage(image_file_3, &image_3)) {
 		cout <<"Can't open file " << image_file_3 << endl;
 		return 0;
 	}
-	FindLightSource(input_file, output_file, &an_image);
-
+	
+	ComputeSurfaceNormals(input_file, &image_1, &image_2, &image_3, 
+		threshold, step);
+		
+	if (!WriteImage(output_file, image_1)){
+		cout << "Can't write to file " << output_file << endl;
+		return 0;
+	}
 
 }

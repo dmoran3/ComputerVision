@@ -83,6 +83,10 @@ void DrawLine(int x0, int y0, int x1, int y1, int color,
 void ExportObjectData(int threshold, std::string text_file, Image *an_image);
 
 void FindLightSource(std::string in_file, std::string out_file, Image *an_image);
+
+void ComputeSurfaceNormals(std::string in_file,Image* image_1,Image* image_2, Image* image_3, int threshold, int step);
+
+void ComputeAlbedoMap(std::string in_file,Image* image_1,Image* image_2, Image* image_3, int threshold);
 //----------------------------------------------------------------------
 }  // namespace ComputerVisionProjects
 
