@@ -30,8 +30,46 @@ while True:
     time.wait(0.5) # 0.5sec interval
 '''
 
+# Dan 5/10
+lux = pg.screenshot(region=(1530,200, 200, 250))
+scshot = cv2.cvtColor(np.array(scshot), cv2.COLOR_RGB2BGR)
+
+while True: #we should replace this later
+    lux = pg.locateOnScreen('lux_01.png', confidence=0.5)
+    #lux = Box(left=lux.left, top=lux.top, width=lux.width, height=lux.height)
+    lux_center = getCenter(lux)
+    
+    lux_q_skillshot = pg.locateOnScreen('lux_q_skillshot_01.png', confidence=0.5)
+    #lux_q_skillshot = Box(left=lux_q_skillshot.left, top=lux_q_skillshot.top, width=lux_q_skillshot.width, height=lux_q_skillshot.height)
+    lux_q_skillshot_center = getCenter(lux_q_skillshot)
+    
+    skillshot_trajectory = getTrajectory(lux_center, lu_q_skillshot_center)
+    
+    ourCharacter = lux = pg.locateOnScreen('PALCEHOLDER.png', confidence=0.5)
+    #ourCharacter = Box(left=ourCharacter.left, top=ourCharacter.top, width=ourCharacter.width, height=ourCharacter.height)
+    ourCharacter_center = getCenter(ourCharacter)
+    
+    character_trajectory = getTrajectory(lux_center, ourCharacter_center)
+    
+    #if the trajectories are similar enough: (maybe decide this based on size of Q hitbox and character hitbox)
+        #issue movement command perpendicular to skillshot trajectory
+        #and move sqrt(skillshot.width^2 + skillshot.height^2) distance in that direction
+    
+def getCenter(obj):
+    center_x = obj.left + (obj.width/2)
+    center_y = obj.top + (obj.height/2)
+    center = [center_x, center_y]
+    return center
+
+def getTrajectory(obj1, obj2):
+    traj_x = obj1[0] - obj2[0]
+    traj_y = obj1[1] - obj2[1]
+    traj = [traj_x, traj_y]
+    return traj
+  
 cv2.imshow('Screenshot', scshot)
 
 cv2.waitKey(0)
 
 cv2.destoryAllWindows()
+
