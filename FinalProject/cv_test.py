@@ -7,7 +7,8 @@ scshot = pg.screenshot(region=(0,0, 1930, 1090)) # lOL = 34
 scshot = cv2.cvtColor(np.array(scshot), cv2.COLOR_RGB2BGR)
 
 # locate a single object in a screenshot
-lux = pg.locateOnScreen('lux_01.png', confidence=0.5)
+lux = pg.locateOnScreen('lux_01.png', confidence=0.5)# or pg.locateOnScreen('lux_02.png', confidence=0.5),or pg.locateOnScreen('lux_03.png', confidence=0.5),or pg.locateOnScreen('lux_04.png', confidence=0.5)
+#where lux_02, 03, and 04 are the different directions lux may be facing
 print(lux)
 # result ====> Box(left=1544, top=229, width=84, height=125)
 
