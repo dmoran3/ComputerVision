@@ -1,0 +1,6 @@
+1. Test that detection works correctly on static image
+2. Test that trajectory calculation works correctly on static image
+3. Test that movement commands work based on attriibutes from static image
+4. Test that detection works correctly on video
+5. Test that trajectory calculation works correctly on video
+6. Test that movement commands work based on attriibutes from video
