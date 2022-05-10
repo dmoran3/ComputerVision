@@ -1,2 +1,2 @@
 # ComputerVision
-Computer Vision Coursework - Spring 2022
+Computer Vision Final Project - Spring 2022
