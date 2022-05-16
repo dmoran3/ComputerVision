@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pyautogui as pg
+from math import sqrt
 
 scshot = pg.screenshot(region=(0,0, 1930, 1090)) # lOL = 34
 
@@ -38,35 +39,65 @@ scshot = cv2.cvtColor(np.array(scshot), cv2.COLOR_RGB2BGR)
 while True: #we should replace this later
     lux = pg.locateOnScreen('lux_01.png', confidence=0.5)
     #lux = Box(left=lux.left, top=lux.top, width=lux.width, height=lux.height)
-    lux_center = getCenter(lux)
+    lux_center = center(lux)
     
     lux_q_skillshot = pg.locateOnScreen('lux_q_skillshot_01.png', confidence=0.5)
     #lux_q_skillshot = Box(left=lux_q_skillshot.left, top=lux_q_skillshot.top, width=lux_q_skillshot.width, height=lux_q_skillshot.height)
-    lux_q_skillshot_center = getCenter(lux_q_skillshot)
+    lux_q_skillshot_center = center(lux_q_skillshot)
     
-    skillshot_trajectory = getTrajectory(lux_center, lu_q_skillshot_center)
+    skillshot_trajectory = getTrajectory(lux_center, lux_q_skillshot_center)
+    skillshot_trajectory_length = sqrt((skillshot_trajectory[0] * skillshot_trajectory[0]) + (skillshot_trajectory[1] * skillshot_trajectory[1]))
     
     ourCharacter = lux = pg.locateOnScreen('PALCEHOLDER.png', confidence=0.5)
     #ourCharacter = Box(left=ourCharacter.left, top=ourCharacter.top, width=ourCharacter.width, height=ourCharacter.height)
-    ourCharacter_center = getCenter(ourCharacter)
+    ourCharacter_center = center(ourCharacter)
     
     character_trajectory = getTrajectory(lux_center, ourCharacter_center)
+    character_trajectory_length = sqrt((character_trajectory[0] * character_trajectory[0]) + (character_trajectory[1] * character_trajectory[1]))
+    
+    scale_factor = character_trajectory_length / skillshot_trajectory_length
+    
+    scaled_skill_trajectory = [(skillshot_trajectory[0] * scale_factor), (skillshot_trajectory[1] * scale_factor)]
+    
+    '''
+    If the skillshot wont reach us
+    if scaled_skill_trajectory > skillshot_range:
+        exit
+    '''
+    #distance between trajectory of attack and character
+    x_dist_from_skill = scaled_skill_trajectory[0] - character_trajectory[0]
+    y_dist_from_skill = scaled_skill_trajectory[1] - character_trajectory[1]
+    distance_from_skill = sqrt((x_dist_from_skill * x_dist_from_skill) + (y_dist_from_skill * y_dist_from_skill))
+    
+    if distance_from_skill < lux_q_skillshot.width:
+        if x_dist_from_skill < 0:
+            #skill will land to our left, so move right
+            x_comp = lux_q_skillshot.width
+        else:
+            #move left if skill will land to our right or directly on us
+            x_comp = 0-lux_q_skillshot.width
+            
+        if y_dist_from_skill < 0:
+            y_comp = lux_q_skillshot.height
+        else:
+            y_comp = 0 - lux_q_skillshot.height
+    
+    #input move command to (char_loc_x + x_comp, char_loc_y + y_comp)
+    x_dest = char_loc_x + x_comp
+    y_dest = char_loc_y + y_comp
+    pg.click(x = x_dest, y =  y_dest, button = 'right')
+    
     
     #if the trajectories are similar enough: (maybe decide this based on size of Q hitbox and character hitbox)
         #issue movement command perpendicular to skillshot trajectory
         #and move sqrt(skillshot.width^2 + skillshot.height^2) distance in that direction
-    
-def getCenter(obj):
-    center_x = obj.left + (obj.width/2)
-    center_y = obj.top + (obj.height/2)
-    center = [center_x, center_y]
-    return center
 
 def getTrajectory(obj1, obj2):
     traj_x = obj1[0] - obj2[0]
     traj_y = obj1[1] - obj2[1]
     traj = [traj_x, traj_y]
     return traj
+
 
 
 '''
