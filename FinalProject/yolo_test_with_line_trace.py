@@ -13,8 +13,7 @@ INPUT_WIDTH = 320
 INPUT_HEIGHT = 320
 
 SCORE_THRESHOLD = 0.5
-
-CONFIDENCE_THRESHOLD = 0.8
+CONFIDENCE_THRESHOLD = 0.6
 NMS_THRESHOLD = 0.45
 size_scale = 1
 
@@ -54,6 +53,21 @@ while True:
         # Create the Image
         img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
         frame = np.array(img)
+    
+    # To show frame in Python window at the last part
+    original_frame = np.copy(frame)
+    # if you want see black box at the center of screen use this code,
+    #original_frame = frame
+    
+    # To hide my character , draw black rect
+    my_character_box_size_x = 76
+    my_character_box_size_y = 100
+    top_left_x = region['width'] // 2 - my_character_box_size_x // 2 - 70
+    top_right_y = region['height'] // 2 - my_character_box_size_y // 2 - 40
+    cv2.rectangle(frame, (top_left_x,top_right_y), (top_left_x + my_character_box_size_x , top_right_y + my_character_box_size_y), (0, 0, 0), -1)
+    
+    
+    
     frame_height, frame_width = frame.shape[:2]
     
     # Detection
@@ -122,29 +136,22 @@ while True:
         if class_0_max_index != -1: # class 0 found
             (x, y) = (boxes[class_0_max_index][0], boxes[class_0_max_index][1])
             (w, h) = (boxes[class_0_max_index][2], boxes[class_0_max_index][3])
-            # if lux_region: # if lux is found right before the loop
-            #     x = x + lux_region[0]
-            #     y = y + lux_region[1]
             
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 255), 2)
+            cv2.rectangle(original_frame, (x, y), (x + w, y + h), (255, 255, 255), 2)
             
             lux_center_x = int(x + (w/2))
             lux_center_y = int(y + (h/2))
             lux_center = (lux_center_x, lux_center_y)
             lux_found = True
         else:
-            #lux_region = None
             lux_found = False
         
         
         if class_1_max_index != -1: # class 1 found
-            # if lux_region: # if lux is found right before the loop
-            #     x = x + lux_region[0]
-            #     y = y + lux_region[1]
             (x, y) = (boxes[class_1_max_index][0], boxes[class_1_max_index][1])
             (w, h) = (boxes[class_1_max_index][2], boxes[class_1_max_index][3])
             print(x,y,w,h)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            cv2.rectangle(original_frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
             q_center_x = int(x + (w/2))
             q_center_y = int(y + (h/2))
             q_center = (q_center_x, q_center_y)
@@ -154,13 +161,13 @@ while True:
     
     #test Trajectory calc
     if lux_found and q_found:
-        cv2.line(frame, lux_center, q_center, (255, 255, 0), 5)
+        cv2.line(original_frame, lux_center, q_center, (255, 255, 0), 5)
         #draw a line between them
         
     
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frame = cv2.resize(frame, (frame.shape[1] // size_scale, frame.shape[0] // size_scale))
-    cv2.imshow("frame", frame)
+    original_frame = cv2.cvtColor(original_frame, cv2.COLOR_BGR2RGB)
+    original_frame = cv2.resize(original_frame, (original_frame.shape[1] // size_scale, original_frame.shape[0] // size_scale))
+    cv2.imshow("frame", original_frame)
     cv2.waitKey(1)
     
 
